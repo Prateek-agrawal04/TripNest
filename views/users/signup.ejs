@@ -1,0 +1,25 @@
+<% layout('/layouts/boilerplate') -%>
+<body>
+    <div class="row mt-3">
+        <h2 class="col-6 offset-3">SignUp on TripNest</h2>
+        <div class="col-6 offset-3">
+            <form action="/signup" method="post" class="needs-validation" novalidate>
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input name="username" id="username" type="text" placeholder="Enter Username" class="form-control" required>
+                    <div class="valid-feedback">Username looks good!</div>
+                    <div class="invalid-feedback">Username should be valid</div>
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">E-Mail</label>
+                    <input name="email" id="email" type="email" placeholder="Enter E-Mail" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input name="password" id="password" type="password" placeholder="Enter Password" class="form-control" required>
+                </div>
+                <button class="btn btn-success">SignUp</button>
+            </form>
+        </div>
+    </div>
+</body>

@@ -1,14 +1,19 @@
 const express= require("express");
 const app= express();
 const mongoose= require("mongoose");
-const Listing= require("./models/listings.js")
 const path= require("path");
 const methodOverride= require("method-override");
 const ejsMate= require("ejs-mate");
-const wrapAsync= require("./utils/wrapAsync.js");
 const ExpressError= require("./utils/ExpressError.js");
-const {listingSchema, reviewSchema}= require("./schema.js");
-const Review= require("./models/review.js");
+const flash= require("connect-flash");
+const passport= require("passport");
+const LocalStrategy= require("passport-local");
+const User= require("./models/user.js"); 
+
+const listingRouter= require("./routes/listing.js");
+const reviewRouter= require("./routes/review.js");
+const userRouter= require("./routes/user.js");
+const session = require("express-session");
 
 const MONGO_URL= 'mongodb://127.0.0.1:27017/wanderlust';
 
@@ -33,108 +38,50 @@ app.listen(8080, ()=>{
     console.log("Server is listening to port 8080");
 });
 
-const validateListing= (req, res, next)=>{
-    const {error}= listingSchema.validate(req.body);
-    console.log(error);
-        if(error){
-            let errMsg= error.details.map((el)=> el.message).join(",");
-            throw new ExpressError(400, errMsg);
-        }
-        else{
-            next();
-        }
-}
-
-const validateReview= (req, res, next)=>{
-    const {error}= reviewSchema.validate(req.body);
-    console.log(error);
-        if(error){
-            let errMsg= error.details.map((el)=> el.message).join(",");
-            throw new ExpressError(400, errMsg);
-        }
-        else{
-            next();
-        }
-}
+const sessionOptions= {
+    secret: "Mysecretcode",
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        expires: Date.now() + 7* 24* 60* 60* 1000,
+        maxAge: 7* 24* 60* 60* 1000,
+        httpOnly: true,
+    }
+};
 
 app.get('/', (req, res)=>{
     res.send("Hi I am root");
 });
 
-// Index Route
-app.get("/listings", wrapAsync(async (req, res)=>{
-    const allListings= await Listing.find({});
-    res.render("listings/index", {allListings});
-}));
+app.use(session(sessionOptions));
+app.use(flash());
 
-// Show Route
-app.get("/listings/:id", wrapAsync(async (req, res)=>{
-    let {id}= req.params;
-    const listing= await Listing.findById(id).populate("reviews");
-    res.render("listings/show", {listing});
-}));
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
-// New Route
-app.get("/listing/new", (req, res)=>{
-    res.render("listings/new");
-})
+app.use((req, res, next)=>{
+    res.locals.success= req.flash("success");
+    res.locals.error= req.flash("error");
+    next();
+});
 
-// Create Route
-app.post("/listings", validateListing, wrapAsync(async (req, res, next)=>{
-        
-        const newListing= new Listing(req.body.listing);
-        await newListing.save();
-        res.redirect("/listings");
-}));
+// app.get("/demouser", async (req, res)=> {
+//     let fakeUser= new User({
+//         email: "student@gmail.com",
+//         username: "prat_agrawal",
+//     });
+//     let registeredUser= await User.register(fakeUser, "1234");
+//     res.send(registeredUser);
+// });
 
-// Edit Route
-app.get("/listings/:id/edit", wrapAsync(async (req, res)=>{
-    let {id}= req.params;
-    const listing= await Listing.findById(id);
-    res.render("listings/edit", {listing});
-}));
+app.use("/listings", listingRouter);
 
-// Update Route
-app.put("/listings/:id", validateListing, wrapAsync(async (req, res)=>{
-    if(!req.body.listing){
-        throw new ExpressError(400, "Send valid data for listing");
-    }
-    let {id}= req.params;
-    await Listing.findByIdAndUpdate(id, {...req.body.listing});
-    res.redirect(`/listings/${id}`);
-}));
+app.use("/listings/:id/reviews", reviewRouter);
 
-// Delete Route
-app.delete("/listing/:id", wrapAsync(async (req, res)=>{
-    let {id}= req.params;
-    let deletedListing= await Listing.findByIdAndDelete(id);
-    console.log(deletedListing);
-    res.redirect("/listings");
-}));
-
-// Reviews Post Route
-app.post("/listings/:id/reviews",validateReview, wrapAsync(async(req, res)=>{
-    let listing= await Listing.findById(req.params.id);
-    let newReview= new Review(req.body.review);
-
-    listing.reviews.push(newReview);
-
-    await newReview.save();
-    await listing.save();
-
-    console.log("New review Saved");
-    res.redirect(`/listings/${listing._id}`);
-}));
-
-// Review Delete Route
-app.delete("/listings/:id/reviews/:reviewId", wrapAsync(async(req, res)=>{
-    let {id, reviewId}= req.params;
-
-    await Listing.findByIdAndUpdate(id, {$pull: {reviews: reviewId}});
-    await Review.findByIdAndDelete(reviewId);
-
-    res.redirect(`/listings/${id}`);
-}));
+app.use("/", userRouter);
 
 // Page not found
 app.all(/.*/, (req, res, next)=>{
